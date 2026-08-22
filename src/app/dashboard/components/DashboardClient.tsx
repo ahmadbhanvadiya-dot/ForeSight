@@ -446,8 +446,7 @@ export default function DashboardClient() {
           MAIN
       ====================================================== */}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8
-      <WorkRequestCreator />">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
 
 
         {/* ====================================================
@@ -742,6 +741,9 @@ export default function DashboardClient() {
 
 
             <div className="space-y-3">
+
+                  <WorkRequestCreator />
+
 
               {urgent.length > 0 ? (
 
