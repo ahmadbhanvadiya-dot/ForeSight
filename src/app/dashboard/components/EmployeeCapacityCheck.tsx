@@ -163,21 +163,22 @@ export default function EmployeeCapacityCheck() {
 
   const loadEmployees = async () => {
     const { data, error } =
-      await supabase
-        .from('employees')
-        .select(`
-          id,
-          name,
-          email,
-          department,
-          role,
-          employee_capacity (
-            stress_score,
-            stress_level,
-            current_workload,
-            available_capacity
-          )
-        `);
+  await supabase
+    .from('employees')
+    .select(`
+      id,
+      employee_code,
+      name,
+      email,
+      department,
+      role,
+      employee_capacity (
+        stress_score,
+        stress_level,
+        current_workload,
+        available_capacity
+      )
+    `);
 
     if (error) {
       console.error(error);
@@ -188,51 +189,45 @@ export default function EmployeeCapacityCheck() {
     if (!data) return;
 
 
-    const mapped: Employee[] = data.map(
-      (item: any) => {
+   const mapped: Employee[] = data.map(
+  (item: any) => {
+    const capacityData =
+      Array.isArray(item.employee_capacity)
+        ? item.employee_capacity[0]
+        : item.employee_capacity;
 
-        const capacityData =
-          Array.isArray(
-            item.employee_capacity
-          )
-            ? item.employee_capacity[0]
-            : item.employee_capacity;
+    const currentWorkload =
+      capacityData?.current_workload ?? 0;
 
+    const availableCapacity =
+      capacityData?.available_capacity ?? 0;
 
-        const currentWorkload =
-          capacityData?.current_workload ?? 0;
+    const skills =
+      departmentSkills[item.department ?? ''] ?? [];
 
+    // Convert stress level into available work capacity
+    const employeeCapacity: CapacityLevel =
+      capacityData?.stress_level === 'HIGH'
+        ? 'LOW'
+        : capacityData?.stress_level === 'MEDIUM'
+          ? 'MEDIUM'
+          : 'HIGH';
 
-        const availableCapacity =
-          capacityData?.available_capacity ??
-          0;
-
-
-        const skills =
-          departmentSkills[
-            item.department ?? ''
-          ] ?? [];
-
-
-        return {
-          id: item.id,
-          name: item.name,
-          email: item.email,
-          department: item.department,
-          role: item.role,
-          capacity:
-            capacityData?.stress_level === 'HIGH'
-              ? 'LOW'
-              : capacityData?.stress_level === 'MEDIUM'
-                ? 'MEDIUM'
-                : 'HIGH',
-          availableHours:
-            availableCapacity,
-          currentWorkload,
-          skills,
-        };
-      }
-    );
+    return {
+      id: item.id,
+      employee_code: item.employee_code,
+      name: item.name,
+      email: item.email,
+      department: item.department,
+      role: item.role,
+      capacity: employeeCapacity,
+      availableHours: availableCapacity,
+      currentWorkload,
+      skills,
+    };
+  }
+);
+      
 
 
     const matches = mapped
