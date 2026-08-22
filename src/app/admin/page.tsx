@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import EmployeeDetails from './components/EmployeeDetails';
 import {
   Activity,
   AlertTriangle,
@@ -53,6 +54,8 @@ export default function AdminPage() {
   const [capacities, setCapacities] = useState<Capacity[]>([]);
   const [requests, setRequests] = useState<WorkRequest[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [selectedEmployee, setSelectedEmployee] =
+  useState<Employee | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -291,7 +294,27 @@ export default function AdminPage() {
       </div>
     );
   }
+    if (selectedEmployee) {
+  const selectedCapacity =
+    capacities.find(
+      (item) =>
+        item.employee_id === selectedEmployee.id
+    ) ?? null;
 
+  return (
+    <main className="min-h-screen p-4 md:p-6 lg:p-8">
+      <EmployeeDetails
+        employee={selectedEmployee}
+        capacity={selectedCapacity}
+        requests={requests}
+        assignments={assignments}
+        onBack={() =>
+          setSelectedEmployee(null)
+        }
+      />
+    </main>
+  );
+}
   return (
     <main className="min-h-screen p-4 md:p-6 lg:p-8">
 
