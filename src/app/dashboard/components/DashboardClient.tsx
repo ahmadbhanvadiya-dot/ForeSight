@@ -1089,15 +1089,7 @@ export default function DashboardClient() {
                         </td>
 
                         <td className="px-5 py-3.5">
-  <p className="text-xs font-semibold text-foreground">
-    {req.employee?.name || 'Unassigned'}
-  </p>
-
-  {req.employee?.employee_code && (
-    <p className="text-[10px] text-muted-foreground">
-      {req.employee.employee_code}
-    </p>
-  )}
+  
 </td>
 
 
