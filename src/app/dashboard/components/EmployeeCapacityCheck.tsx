@@ -138,12 +138,11 @@ export default function EmployeeCapacityCheck() {
       return null;
     }
 
-    const { data, error } =
-  await supabase
-    .from('employees')
-    .select('*')
-    .eq('employee_code', employeeId.trim())
-    .single();
+    const { data, error } = await supabase
+  .from('employees')
+  .select('*')
+  .eq('employee_code', employeeId.trim())
+  .single();
 
     if (error || !data) {
       setError(
