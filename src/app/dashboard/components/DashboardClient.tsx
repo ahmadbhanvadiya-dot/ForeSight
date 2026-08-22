@@ -491,8 +491,7 @@ export default function DashboardClient() {
           </div>
 
         </motion.div>
-        
-             <WorkRequestCreator />
+
 
         {/* ====================================================
             STATS
@@ -1193,6 +1192,8 @@ export default function DashboardClient() {
           </div>
 
         </motion.div>
+
+        <WorkRequestCreator />
 
       </main>
 
