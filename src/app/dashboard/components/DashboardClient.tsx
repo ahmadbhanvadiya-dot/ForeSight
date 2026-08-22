@@ -41,6 +41,7 @@ import {
 } from '../../../lib/risk-engine';
 
 import EmployeeCapacityCheck from './EmployeeCapacityCheck';
+import WorkRequestCreator from './WorkRequestCreator';
 
 
 // ============================================================
@@ -445,7 +446,8 @@ export default function DashboardClient() {
           MAIN
       ====================================================== */}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8
+      <WorkRequestCreator />">
 
 
         {/* ====================================================
