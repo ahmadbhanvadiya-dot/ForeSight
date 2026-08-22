@@ -133,27 +133,41 @@ export default function EmployeeCapacityCheck() {
   // ==========================================================
 
   const findEmployee = async () => {
-    if (!employeeId.trim()) {
-      setError('Please enter your employee ID.');
-      return null;
-    }
+  if (!employeeId.trim()) {
+    setError('Please enter your employee ID.');
+    return null;
+  }
 
-    const { data, error } = await supabase
-  .from('employees')
-  .select('*')
-  .eq('employee_code', employeeId.trim())
-  .single();
+  const code = employeeId.trim().toUpperCase();
 
-    if (error || !data) {
-      setError(
-        'Employee not found. Please check the employee ID.'
-      );
+  const { data, error } = await supabase
+    .from('employees')
+    .select(`
+      id,
+      employee_code,
+      name,
+      email,
+      department,
+      role
+    `)
+    .eq('employee_code', code)
+    .maybeSingle();
 
-      return null;
-    }
+  if (error) {
+    console.error('Employee lookup error:', error);
+    setError(`Database error: ${error.message}`);
+    return null;
+  }
 
-    return data;
-  };
+  if (!data) {
+    setError(
+      'Employee not found. Please check the employee ID.'
+    );
+    return null;
+  }
+
+  return data;
+};
 
 
   // ==========================================================
@@ -263,13 +277,10 @@ export default function EmployeeCapacityCheck() {
       // FIND EMPLOYEE
       // -------------------------------------------------------
 
-      const currentEmployee =
-        await findEmployee();
-
-
-      if (!currentEmployee) {
-        return;
-      }
+const currentEmployee = await findEmployee();
+if (!currentEmployee) {
+  return;
+}
 
 
       setEmployee({
@@ -789,9 +800,7 @@ export default function EmployeeCapacityCheck() {
                   </p>
 
                   <p className="text-[10px] text-muted-foreground">
-
-                    {employee.id} ·{' '}
-                    {employee.department}
+                      {employee.employee_code} · {employee.department}
 
                   </p>
 
