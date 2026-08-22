@@ -1,22 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
+const supabaseServiceKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabase = createClient(
   supabaseUrl,
-  supabaseKey
+  supabaseServiceKey
 );
-
-type EmployeeCapacity = {
-  employee_id: string;
-  stress_score: number;
-  stress_level: 'LOW' | 'MEDIUM' | 'HIGH';
-  current_workload: number;
-  max_workload: number;
-  available_capacity: number;
-};
 
 export async function POST(req: Request) {
   try {
@@ -30,43 +24,60 @@ export async function POST(req: Request) {
       risk_score,
     } = body;
 
-    if (!title || !department) {
+    // -----------------------------------------
+    // VALIDATION
+    // -----------------------------------------
+
+    if (!title?.trim()) {
       return NextResponse.json(
         {
-          error:
-            'Title and department are required.',
+          error: 'Request title is required.',
         },
         { status: 400 }
       );
     }
 
-    // --------------------------------------------------------
-    // 1. CREATE WORK REQUEST
-    // --------------------------------------------------------
-
-    const {
-      data: request,
-      error: requestError,
-    } = await supabase
-      .from('work_requests')
-      .insert({
-        title,
-        description,
-        department,
-        priority: priority || 'MEDIUM',
-        risk_score: risk_score ?? 50,
-        status: 'PENDING',
-      })
-      .select()
-      .single();
-
-    if (requestError) {
-      throw requestError;
+    if (!department) {
+      return NextResponse.json(
+        {
+          error: 'Department is required.',
+        },
+        { status: 400 }
+      );
     }
 
-    // --------------------------------------------------------
-    // 2. GET EMPLOYEES + CAPACITY
-    // --------------------------------------------------------
+    // -----------------------------------------
+    // 1. CREATE WORK REQUEST
+    // -----------------------------------------
+
+    const { data: request, error: requestError } =
+      await supabase
+        .from('work_requests')
+        .insert({
+          title: title.trim(),
+          description: description?.trim() || '',
+          department,
+          priority: priority || 'MEDIUM',
+          risk_score: risk_score ?? 50,
+          status: 'PENDING',
+        })
+        .select()
+        .single();
+
+    if (requestError) {
+      console.error(
+        'Work request error:',
+        requestError
+      );
+
+      throw new Error(
+        requestError.message
+      );
+    }
+
+    // -----------------------------------------
+    // 2. GET EMPLOYEES
+    // -----------------------------------------
 
     const {
       data: employees,
@@ -77,6 +88,7 @@ export async function POST(req: Request) {
         id,
         employee_code,
         name,
+        email,
         department,
         role,
         employee_capacity (
@@ -89,94 +101,111 @@ export async function POST(req: Request) {
       `);
 
     if (employeeError) {
-      throw employeeError;
+      console.error(
+        'Employee query error:',
+        employeeError
+      );
+
+      throw new Error(
+        employeeError.message
+      );
     }
 
-    if (!employees || employees.length === 0) {
+    if (!employees?.length) {
       return NextResponse.json({
         success: true,
-        request,
         assigned: false,
+        request,
         message:
-          'Request created, but no employees are available.',
+          'Request created, but no employees were found.',
       });
     }
 
-    // --------------------------------------------------------
+    // -----------------------------------------
     // 3. SCORE EMPLOYEES
-    // --------------------------------------------------------
+    // -----------------------------------------
 
-    const scoredEmployees = employees
+    const candidates = employees
       .map((employee: any) => {
-        const capacity:
-          | EmployeeCapacity
-          | undefined =
-          Array.isArray(
-            employee.employee_capacity
-          )
-            ? employee.employee_capacity[0]
-            : employee.employee_capacity;
+        const capacity = Array.isArray(
+          employee.employee_capacity
+        )
+          ? employee.employee_capacity[0]
+          : employee.employee_capacity;
 
         if (!capacity) {
           return null;
         }
 
-        // Don't assign overloaded employees
+        const stressScore =
+          Number(
+            capacity.stress_score ?? 50
+          );
+
+        const currentWorkload =
+          Number(
+            capacity.current_workload ?? 0
+          );
+
+        const availableCapacity =
+          Number(
+            capacity.available_capacity ?? 0
+          );
+
+        // Don't assign HIGH stress employees
         if (
           capacity.stress_level === 'HIGH'
         ) {
           return null;
         }
 
-        if (
-          capacity.available_capacity <= 0
-        ) {
+        // Don't assign employees with no capacity
+        if (availableCapacity <= 0) {
           return null;
         }
 
-        // Department match
-        const departmentMatch =
-          employee.department ===
-          department
+        // -------------------------------------
+        // SCORING
+        // -------------------------------------
+
+        const departmentScore =
+          employee.department === department
             ? 100
-            : 0;
+            : 40;
 
-        // Lower stress = better
-        const stressScore =
-          100 - capacity.stress_score;
+        const stressCapacityScore =
+          Math.max(
+            0,
+            100 - stressScore
+          );
 
-        // More available capacity = better
         const availabilityScore =
           Math.min(
-            capacity.available_capacity * 10,
-            100
+            100,
+            availableCapacity * 10
           );
 
-        // Lower workload = better
         const workloadScore =
           Math.max(
+            0,
             100 -
-              capacity.current_workload *
-                10,
-            0
+              currentWorkload * 10
           );
 
-        // ----------------------------------------------------
-        // FINAL FORESIGHT SCORE
-        // ----------------------------------------------------
-
         const finalScore =
-          departmentMatch * 0.4 +
-          stressScore * 0.25 +
-          availabilityScore * 0.2 +
+          departmentScore * 0.40 +
+          stressCapacityScore * 0.25 +
+          availabilityScore * 0.20 +
           workloadScore * 0.15;
 
         return {
           employee,
           capacity,
+
           finalScore,
-          departmentMatch,
-          stressScore,
+
+          departmentScore,
+          stressCapacityScore,
           availabilityScore,
           workloadScore,
         };
@@ -188,28 +217,26 @@ export async function POST(req: Request) {
           a.finalScore
       );
 
-    // --------------------------------------------------------
-    // 4. NO EMPLOYEE AVAILABLE
-    // --------------------------------------------------------
+    // -----------------------------------------
+    // 4. NO SUITABLE EMPLOYEE
+    // -----------------------------------------
 
-    if (
-      scoredEmployees.length === 0
-    ) {
+    if (!candidates.length) {
       return NextResponse.json({
         success: true,
-        request,
         assigned: false,
+        request,
+
         message:
-          'No suitable employee currently has enough capacity.',
+          'No employee currently has enough capacity for this request.',
       });
     }
 
-    // --------------------------------------------------------
-    // 5. SELECT BEST EMPLOYEE
-    // --------------------------------------------------------
+    // -----------------------------------------
+    // 5. BEST EMPLOYEE
+    // -----------------------------------------
 
-    const best =
-      scoredEmployees[0] as any;
+    const best = candidates[0] as any;
 
     const selectedEmployee =
       best.employee;
@@ -217,9 +244,9 @@ export async function POST(req: Request) {
     const selectedCapacity =
       best.capacity;
 
-    // --------------------------------------------------------
+    // -----------------------------------------
     // 6. CREATE ASSIGNMENT
-    // --------------------------------------------------------
+    // -----------------------------------------
 
     const {
       data: assignment,
@@ -227,69 +254,76 @@ export async function POST(req: Request) {
     } = await supabase
       .from('assignments')
       .insert({
-        request_id:
-          request.id,
-
+        request_id: request.id,
         employee_id:
           selectedEmployee.id,
-
         status: 'ASSIGNED',
       })
       .select()
       .single();
 
     if (assignmentError) {
-      throw assignmentError;
-    }
-
-    // --------------------------------------------------------
-    // 7. UPDATE REQUEST STATUS
-    // --------------------------------------------------------
-
-    const {
-      error: updateRequestError,
-    } = await supabase
-      .from('work_requests')
-      .update({
-        status: 'ASSIGNED',
-      })
-      .eq('id', request.id);
-
-    if (updateRequestError) {
-      throw updateRequestError;
-    }
-
-    // --------------------------------------------------------
-    // 8. INCREASE EMPLOYEE WORKLOAD
-    // --------------------------------------------------------
-
-    const newWorkload =
-      selectedCapacity.current_workload +
-      1;
-
-    const {
-      error: workloadError,
-    } = await supabase
-      .from('employee_capacity')
-      .update({
-        current_workload:
-          newWorkload,
-
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq(
-        'employee_id',
-        selectedEmployee.id
+      console.error(
+        'Assignment error:',
+        assignmentError
       );
 
-    if (workloadError) {
-      throw workloadError;
+      throw new Error(
+        assignmentError.message
+      );
     }
 
-    // --------------------------------------------------------
-    // 9. RETURN FORESIGHT DECISION
-    // --------------------------------------------------------
+    // -----------------------------------------
+    // 7. UPDATE REQUEST
+    // -----------------------------------------
+
+    const { error: requestUpdateError } =
+      await supabase
+        .from('work_requests')
+        .update({
+          status: 'ASSIGNED',
+        })
+        .eq('id', request.id);
+
+    if (requestUpdateError) {
+      throw new Error(
+        requestUpdateError.message
+      );
+    }
+
+    // -----------------------------------------
+    // 8. UPDATE EMPLOYEE WORKLOAD
+    // -----------------------------------------
+
+    const newWorkload =
+      Number(
+        selectedCapacity.current_workload ?? 0
+      ) + 1;
+
+    const { error: capacityUpdateError } =
+      await supabase
+        .from('employee_capacity')
+        .update({
+          current_workload:
+            newWorkload,
+
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq(
+          'employee_id',
+          selectedEmployee.id
+        );
+
+    if (capacityUpdateError) {
+      throw new Error(
+        capacityUpdateError.message
+      );
+    }
+
+    // -----------------------------------------
+    // 9. RETURN RESULT
+    // -----------------------------------------
 
     return NextResponse.json({
       success: true,
@@ -311,28 +345,32 @@ export async function POST(req: Request) {
 
         department:
           selectedEmployee.department,
+
+        role:
+          selectedEmployee.role,
       },
 
-      foresightScore:
-        Math.round(
-          best.finalScore
-        ),
+      foresightScore: Math.round(
+        best.finalScore
+      ),
 
       reasoning: {
-        departmentMatch:
-          best.departmentMatch,
-
-        stressScore:
+        department:
           Math.round(
-            best.stressScore
+            best.departmentScore
           ),
 
-        availabilityScore:
+        capacity:
+          Math.round(
+            best.stressCapacityScore
+          ),
+
+        availability:
           Math.round(
             best.availabilityScore
           ),
 
-        workloadScore:
+        workload:
           Math.round(
             best.workloadScore
           ),
@@ -341,7 +379,7 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error(
-      'Assignment engine error:',
+      'Foresight routing error:',
       error
     );
 
@@ -349,7 +387,7 @@ export async function POST(req: Request) {
       {
         error:
           error?.message ||
-          'Assignment engine failed.',
+          'Foresight routing failed.',
       },
       { status: 500 }
     );
