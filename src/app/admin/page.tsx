@@ -635,10 +635,13 @@ export default function AdminPage() {
                     );
 
                   return (
-                    <div
-                      key={employee.id}
-                      className="flex items-center gap-3 rounded-xl border border-border p-3"
-                    >
+                    <button
+  key={employee.id}
+  onClick={() =>
+    setSelectedEmployee(employee)
+  }
+  className="w-full text-left flex items-center gap-3 rounded-xl border border-border p-3 hover:bg-muted/20 transition-colors"
+>
 
                       <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
                         {employee.name
@@ -685,7 +688,7 @@ export default function AdminPage() {
 
                       </div>
 
-                    </div>
+                    </button>
                   );
                 })}
 
