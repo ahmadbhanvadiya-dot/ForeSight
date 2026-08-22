@@ -412,7 +412,7 @@ export default function DashboardClient() {
                   className="text-primary"
                 />
 
-              </div>
+             
 
               <span className="font-bold text-sm text-foreground">
                 Foresight
