@@ -22,6 +22,7 @@ type CapacityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
 type Employee = {
   id: string;
+  employee_code: string;
   name: string;
   email: string;
   department: string | null;
@@ -138,11 +139,11 @@ export default function EmployeeCapacityCheck() {
     }
 
     const { data, error } =
-      await supabase
-        .from('employees')
-        .select('*')
-        .eq('id', employeeId.trim())
-        .single();
+  await supabase
+    .from('employees')
+    .select('*')
+    .eq('employee_code', employeeId.trim())
+    .single();
 
     if (error || !data) {
       setError(
