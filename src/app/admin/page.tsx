@@ -302,6 +302,15 @@ export default function AdminPage() {
     );
   };
 
+  const getAssignmentForRequest = (
+  requestId: string
+) => {
+  return assignments.find(
+    (assignment) =>
+      assignment.request_id === requestId
+  );
+};
+
   const getEmployee = (
     employeeId: string
   ) => {
@@ -412,6 +421,239 @@ export default function AdminPage() {
             setSelectedEmployee(null)
           }
         />
+          {/* =========================================================
+    ACTIVE WORK REQUESTS
+========================================================= */}
+
+<div className="mt-8">
+
+  <div className="flex items-center justify-between mb-4">
+
+    <div>
+      <span className="section-label">
+        Intelligent Routing
+      </span>
+
+      <h2 className="text-lg font-black text-foreground mt-1">
+        Active Work Requests
+      </h2>
+
+      <p className="text-xs text-muted-foreground mt-1">
+        Requests created through Foresight and their current assignments.
+      </p>
+    </div>
+
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Activity size={13} />
+      {requests.length} total
+    </div>
+
+  </div>
+
+
+  <div className="glass-card rounded-2xl border border-border overflow-hidden">
+
+    {requests.length === 0 ? (
+
+      <div className="p-8 text-center">
+        <CheckCircle2
+          size={20}
+          className="mx-auto mb-2 text-muted-foreground"
+        />
+
+        <p className="text-sm font-semibold text-foreground">
+          No work requests yet
+        </p>
+
+        <p className="text-xs text-muted-foreground mt-1">
+          Create a request from the dashboard to see it here.
+        </p>
+      </div>
+
+    ) : (
+
+      <div className="overflow-x-auto">
+
+        <table className="w-full text-left">
+
+          <thead className="border-b border-border">
+
+            <tr>
+
+              <th className="px-5 py-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Request
+              </th>
+
+              <th className="px-5 py-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Department
+              </th>
+
+              <th className="px-5 py-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Priority
+              </th>
+
+              <th className="px-5 py-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Assigned To
+              </th>
+
+              <th className="px-5 py-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Status
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody className="divide-y divide-border">
+
+            {requests.map((request) => {
+
+              const assignment =
+                getAssignmentForRequest(request.id);
+
+              const employee =
+                assignment
+                  ? getEmployee(
+                      assignment.employee_id
+                    )
+                  : null;
+
+              return (
+                <tr
+                  key={request.id}
+                  className="hover:bg-muted/10 transition-colors"
+                >
+
+                  {/* REQUEST */}
+
+                  <td className="px-5 py-4">
+
+                    <p className="text-xs font-bold text-foreground">
+                      {request.title}
+                    </p>
+
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      #{request.id.slice(0, 8)}
+                    </p>
+
+                  </td>
+
+
+                  {/* DEPARTMENT */}
+
+                  <td className="px-5 py-4">
+
+                    <span className="text-xs text-foreground">
+                      {request.department || '—'}
+                    </span>
+
+                  </td>
+
+
+                  {/* PRIORITY */}
+
+                  <td className="px-5 py-4">
+
+                    <span
+                      className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                        request.priority === 'CRITICAL'
+                          ? 'bg-risk-high/10 text-risk-high'
+                          : request.priority === 'HIGH'
+                            ? 'bg-risk-high/10 text-risk-high'
+                            : request.priority === 'MEDIUM'
+                              ? 'bg-risk-medium/10 text-risk-medium'
+                              : 'bg-risk-low/10 text-risk-low'
+                      }`}
+                    >
+                      {request.priority || 'MEDIUM'}
+                    </span>
+
+                  </td>
+
+
+                  {/* ASSIGNED EMPLOYEE */}
+
+                  <td className="px-5 py-4">
+
+                    {employee ? (
+
+                      <div className="flex items-center gap-2">
+
+                        <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                          <UserRound
+                            size={13}
+                            className="text-primary"
+                          />
+                        </div>
+
+                        <div>
+
+                          <p className="text-xs font-bold text-foreground">
+                            {employee.name}
+                          </p>
+
+                          <p className="text-[10px] text-muted-foreground">
+                            {employee.employee_code}
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    ) : (
+
+                      <span className="text-xs text-muted-foreground">
+                        Unassigned
+                      </span>
+
+                    )}
+
+                  </td>
+
+
+                  {/* STATUS */}
+
+                  <td className="px-5 py-4">
+
+                    <div className="flex items-center gap-1.5">
+
+                      {request.status === 'ASSIGNED' ? (
+                        <CheckCircle2
+                          size={13}
+                          className="text-risk-low"
+                        />
+                      ) : (
+                        <Clock3
+                          size={13}
+                          className="text-risk-medium"
+                        />
+                      )}
+
+                      <span className="text-xs font-semibold text-foreground">
+                        {request.status || 'PENDING'}
+                      </span>
+
+                    </div>
+
+                  </td>
+
+                </tr>
+              );
+
+            })}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    )}
+
+  </div>
+
+</div>
+
       </main>
     );
   }

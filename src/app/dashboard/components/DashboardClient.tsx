@@ -1011,13 +1011,14 @@ export default function DashboardClient() {
                 <tr className="border-b border-border">
 
                   {[
-                    'Request',
-                    'Department',
-                    'Stage',
-                    'SLA Remaining',
-                    'Risk',
-                    'Action',
-                  ].map((col) => (
+  'Request',
+  'Department',
+  'Stage',
+  'Assigned To',
+  'SLA Remaining',
+  'Risk',
+  'Action',
+].map((col) => (
 
                     <th
                       key={col}
@@ -1086,6 +1087,18 @@ export default function DashboardClient() {
                           </p>
 
                         </td>
+
+                        <td className="px-5 py-3.5">
+  <p className="text-xs font-semibold text-foreground">
+    {req.employee?.name || 'Unassigned'}
+  </p>
+
+  {req.employee?.employee_code && (
+    <p className="text-[10px] text-muted-foreground">
+      {req.employee.employee_code}
+    </p>
+  )}
+</td>
 
 
                         <td className="px-5 py-3.5">
