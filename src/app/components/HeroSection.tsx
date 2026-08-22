@@ -160,8 +160,28 @@ export default function HeroSection() {
   }}
 />
 
+              
               {/* Main card */}
-              <div className="relative glass-card-strong rounded-2xl p-5 border border-risk-high/50 shadow-[0_0_35px_rgba(239,68,68,0.18)]">
+<div className="relative glass-card-strong rounded-2xl p-5 
+  border border-risk-high/40 
+  shadow-[0_0_40px_rgba(239,68,68,0.18),0_0_80px_rgba(59,130,246,0.08)]
+  hover:shadow-[0_0_55px_rgba(239,68,68,0.28),0_0_90px_rgba(59,130,246,0.12)]
+  transition-all duration-500">
+              {/* Live indicator */}
+<div className="flex items-center gap-2 mb-4">
+  <span className="relative flex h-2 w-2">
+    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-risk-high opacity-75"></span>
+    <span className="relative inline-flex h-2 w-2 rounded-full bg-risk-high"></span>
+  </span>
+
+  <span className="text-[10px] font-bold tracking-widest uppercase text-risk-high">
+    Live AI Prediction
+  </span>
+
+  <span className="text-[10px] text-muted-foreground">
+    • Updated now
+  </span>
+</div>
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div>
