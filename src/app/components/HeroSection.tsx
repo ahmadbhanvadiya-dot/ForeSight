@@ -149,25 +149,26 @@ export default function HeroSection() {
             transition={{ duration: 0.8, delay: 0.2, ease: [0.4, 0, 0.2, 1] }}
           >
             <div className="relative w-full max-w-sm">
-              {/* Glow behind card */}
-              <div
-                className="absolute inset-0 rounded-2xl pointer-events-none"
-                style={{
-                  background: 'radial-gradient(ellipse at center, rgba(239,68,68,0.12) 0%, transparent 70%)',
-                  filter: 'blur(20px)',
-                  transform: 'scale(1.1)',
-                }}
-              />
+              {/* Strong risk glow */}
+<div
+  className="absolute -inset-4 rounded-3xl pointer-events-none"
+  style={{
+    background:
+      'radial-gradient(ellipse at center, rgba(239,68,68,0.28) 0%, rgba(99,102,241,0.10) 45%, transparent 75%)',
+    filter: 'blur(28px)',
+    transform: 'scale(1.08)',
+  }}
+/>
 
               {/* Main card */}
-              <div className="relative glass-card-strong rounded-2xl p-5 border border-border glow-high">
+              <div className="relative glass-card-strong rounded-2xl p-5 border border-risk-high/50 shadow-[0_0_35px_rgba(239,68,68,0.18)]">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Request #1042</p>
                     <p className="text-base font-bold text-foreground mt-0.5">License Renewal</p>
                   </div>
-                  <span className="risk-high-badge text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+                  <span className="risk-high-badge text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 border border-risk-high/50 shadow-[0_0_14px_rgba(239,68,68,0.25)]">
                     <AlertTriangle size={11} />
                     HIGH RISK
                   </span>
@@ -195,10 +196,10 @@ export default function HeroSection() {
                 </div>
 
                 {/* Risk Score */}
-                <div className="flex items-center justify-between mb-4 p-3 rounded-xl border border-risk-high/20 bg-risk-high/5">
+                <div className="flex items-center justify-between mb-4 p-4 rounded-xl border border-risk-high/40 bg-risk-high/10 shadow-[inset_0_0_25px_rgba(239,68,68,0.06)]">
                   <div>
                     <p className="text-xs text-muted-foreground">Risk Score</p>
-                    <p className="text-3xl font-extrabold text-risk-high leading-none mt-1">
+                    <p className="text-4xl font-extrabold text-risk-high leading-none mt-1 drop-shadow-[0_0_12px_rgba(239,68,68,0.45)]">
                       <AnimatedNumber target={FINAL_RISK_SCORE} delay={1} />
                       <span className="text-lg">%</span>
                     </p>
