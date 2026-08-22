@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import EmployeeDetails from './components/EmployeeDetails';
+
 import {
   Activity,
   AlertTriangle,
@@ -12,6 +13,7 @@ import {
   TrendingUp,
   ShieldCheck,
   RefreshCw,
+  UserRound,
 } from 'lucide-react';
 
 import { supabase } from '../../lib/supabase';
@@ -50,15 +52,26 @@ type Assignment = {
 };
 
 export default function AdminPage() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [capacities, setCapacities] = useState<Capacity[]>([]);
-  const [requests, setRequests] = useState<WorkRequest[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [selectedEmployee, setSelectedEmployee] =
-  useState<Employee | null>(null);
+  const [employees, setEmployees] =
+    useState<Employee[]>([]);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [capacities, setCapacities] =
+    useState<Capacity[]>([]);
+
+  const [requests, setRequests] =
+    useState<WorkRequest[]>([]);
+
+  const [assignments, setAssignments] =
+    useState<Assignment[]>([]);
+
+  const [selectedEmployee, setSelectedEmployee] =
+    useState<Employee | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState('');
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -188,6 +201,12 @@ export default function AdminPage() {
           Number(request.risk_score ?? 0) >= 70
       ).length;
 
+    const criticalRequests =
+      requests.filter(
+        (request) =>
+          Number(request.risk_score ?? 0) >= 90
+      ).length;
+
     const pendingRequests =
       requests.filter(
         (request) =>
@@ -210,15 +229,60 @@ export default function AdminPage() {
         0
       );
 
+    const overloadedEmployees =
+      capacities.filter((item) => {
+        const workload = Number(
+          item.current_workload ?? 0
+        );
+
+        const max = Number(
+          item.max_workload ?? 10
+        );
+
+        return (
+          max > 0 &&
+          workload / max >= 0.8
+        );
+      }).length;
+
+    const assessedEmployeeIds =
+      new Set(
+        capacities.map(
+          (item) => item.employee_id
+        )
+      );
+
+    const unassessedEmployees =
+      employees.filter(
+        (employee) =>
+          !assessedEmployeeIds.has(
+            employee.id
+          )
+      ).length;
+
     return {
-      totalEmployees: employees.length,
+      totalEmployees:
+        employees.length,
+
       highCapacity,
+
       mediumCapacity,
+
       lowCapacity,
+
       highRiskRequests,
+
+      criticalRequests,
+
       pendingRequests,
+
       assignedRequests,
+
       totalWorkload,
+
+      overloadedEmployees,
+
+      unassessedEmployees,
     };
   }, [
     employees,
@@ -233,7 +297,17 @@ export default function AdminPage() {
       employees.find(
         (employee) =>
           employee.id === employeeId
-      )?.name ?? 'Unknown employee'
+      )?.name ??
+      'Unknown employee'
+    );
+  };
+
+  const getEmployee = (
+    employeeId: string
+  ) => {
+    return employees.find(
+      (employee) =>
+        employee.id === employeeId
     );
   };
 
@@ -281,6 +355,29 @@ export default function AdminPage() {
     return 'text-muted-foreground bg-muted/20';
   };
 
+  const getWorkloadPercentage = (
+    capacity: Capacity | undefined
+  ) => {
+    const workload = Number(
+      capacity?.current_workload ?? 0
+    );
+
+    const max = Number(
+      capacity?.max_workload ?? 10
+    );
+
+    if (max <= 0) {
+      return 0;
+    }
+
+    return Math.min(
+      100,
+      Math.round(
+        (workload / max) * 100
+      )
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center">
@@ -289,32 +386,36 @@ export default function AdminPage() {
             size={16}
             className="animate-spin"
           />
+
           Loading Foresight Admin...
         </div>
       </div>
     );
   }
-    if (selectedEmployee) {
-  const selectedCapacity =
-    capacities.find(
-      (item) =>
-        item.employee_id === selectedEmployee.id
-    ) ?? null;
 
-  return (
-    <main className="min-h-screen p-4 md:p-6 lg:p-8">
-      <EmployeeDetails
-        employee={selectedEmployee}
-        capacity={selectedCapacity}
-        requests={requests}
-        assignments={assignments}
-        onBack={() =>
-          setSelectedEmployee(null)
-        }
-      />
-    </main>
-  );
-}
+  if (selectedEmployee) {
+    const selectedCapacity =
+      capacities.find(
+        (item) =>
+          item.employee_id ===
+          selectedEmployee.id
+      ) ?? null;
+
+    return (
+      <main className="min-h-screen p-4 md:p-6 lg:p-8">
+        <EmployeeDetails
+          employee={selectedEmployee}
+          capacity={selectedCapacity}
+          requests={requests}
+          assignments={assignments}
+          onBack={() =>
+            setSelectedEmployee(null)
+          }
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen p-4 md:p-6 lg:p-8">
 
@@ -332,8 +433,8 @@ export default function AdminPage() {
           </h1>
 
           <p className="text-sm text-muted-foreground mt-2">
-            Workforce capacity, workload and
-            intelligent request routing.
+            Workforce capacity, workload,
+            risk and intelligent request routing.
           </p>
         </div>
 
@@ -342,6 +443,7 @@ export default function AdminPage() {
           className="self-start md:self-auto flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-xs font-semibold hover:bg-muted/20"
         >
           <RefreshCw size={13} />
+
           Refresh
         </button>
 
@@ -359,6 +461,7 @@ export default function AdminPage() {
           />
 
           <div>
+
             <p className="text-xs font-bold text-risk-high">
               Dashboard error
             </p>
@@ -366,13 +469,14 @@ export default function AdminPage() {
             <p className="text-xs text-muted-foreground mt-1">
               {error}
             </p>
+
           </div>
 
         </div>
       )}
 
 
-      {/* STATS */}
+      {/* TOP STATS */}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
 
@@ -387,7 +491,7 @@ export default function AdminPage() {
           icon={<CheckCircle2 size={17} />}
           label="High Capacity"
           value={stats.highCapacity}
-          description="Available for work"
+          description="Available for additional work"
           positive
         />
 
@@ -396,26 +500,29 @@ export default function AdminPage() {
           label="High Risk Requests"
           value={stats.highRiskRequests}
           description="Risk score ≥ 70"
-          danger={stats.highRiskRequests > 0}
+          danger={
+            stats.highRiskRequests > 0
+          }
         />
 
         <StatCard
           icon={<Activity size={17} />}
           label="Active Workload"
           value={stats.totalWorkload}
-          description="Total open workload"
+          description="Total current workload"
         />
 
       </div>
 
 
-      {/* CAPACITY OVERVIEW */}
+      {/* WORKFORCE HEALTH */}
 
       <section className="glass-card rounded-2xl border border-border p-5 mb-6">
 
         <div className="flex items-center justify-between mb-5">
 
           <div>
+
             <span className="section-label">
               Workforce Health
             </span>
@@ -423,6 +530,12 @@ export default function AdminPage() {
             <h2 className="text-lg font-extrabold text-foreground mt-1">
               Capacity Overview
             </h2>
+
+            <p className="text-xs text-muted-foreground mt-1">
+              Current employee capacity based on
+              the latest Foresight check-ins.
+            </p>
+
           </div>
 
           <ShieldCheck
@@ -461,6 +574,400 @@ export default function AdminPage() {
 
         </div>
 
+
+        {/* HEALTH ALERTS */}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+
+          <HealthAlert
+            label="Overloaded Employees"
+            value={
+              stats.overloadedEmployees
+            }
+            description="≥ 80% workload"
+            danger={
+              stats.overloadedEmployees > 0
+            }
+          />
+
+          <HealthAlert
+            label="Unassessed Employees"
+            value={
+              stats.unassessedEmployees
+            }
+            description="No capacity profile"
+          />
+
+          <HealthAlert
+            label="Critical Requests"
+            value={
+              stats.criticalRequests
+            }
+            description="Risk score ≥ 90"
+            danger={
+              stats.criticalRequests > 0
+            }
+          />
+
+        </div>
+
+      </section>
+
+
+      {/* WORKLOAD BALANCE */}
+
+      <section className="glass-card rounded-2xl border border-border p-5 mb-6">
+
+        <div className="flex items-center justify-between mb-5">
+
+          <div>
+
+            <span className="section-label">
+              Workforce Balance
+            </span>
+
+            <h2 className="text-lg font-extrabold text-foreground mt-1">
+              Employee Workload
+            </h2>
+
+            <p className="text-xs text-muted-foreground mt-1">
+              Foresight monitors workload before
+              routing additional work.
+            </p>
+
+          </div>
+
+          <Activity
+            size={18}
+            className="text-primary"
+          />
+
+        </div>
+
+
+        {employees.length === 0 ? (
+
+          <EmptyState
+            icon={<Users size={18} />}
+            message="No employees found."
+          />
+
+        ) : (
+
+          <div className="space-y-3">
+
+            {employees.map((employee) => {
+
+              const capacity =
+                capacities.find(
+                  (item) =>
+                    item.employee_id ===
+                    employee.id
+                );
+
+              const workload =
+                Number(
+                  capacity?.current_workload ??
+                    0
+                );
+
+              const maxWorkload =
+                Number(
+                  capacity?.max_workload ??
+                    10
+                );
+
+              const percentage =
+                getWorkloadPercentage(
+                  capacity
+                );
+
+              const overloaded =
+                percentage >= 80;
+
+              return (
+                <button
+                  key={employee.id}
+                  onClick={() =>
+                    setSelectedEmployee(
+                      employee
+                    )
+                  }
+                  className="w-full text-left rounded-xl border border-border p-4 hover:bg-muted/20 transition-colors"
+                >
+
+                  <div className="flex items-center justify-between gap-4">
+
+                    <div className="flex items-center gap-3 min-w-0">
+
+                      <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+                        {employee.name
+                          ?.slice(0, 2)
+                          .toUpperCase()}
+                      </div>
+
+                      <div className="min-w-0">
+
+                        <p className="text-xs font-bold text-foreground">
+                          {employee.name}
+                        </p>
+
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {employee.employee_code}
+                          {' · '}
+                          {employee.department ??
+                            'No department'}
+                        </p>
+
+                      </div>
+
+                    </div>
+
+
+                    <div className="text-right">
+
+                      <p
+                        className={`text-xs font-black ${
+                          overloaded
+                            ? 'text-risk-high'
+                            : 'text-foreground'
+                        }`}
+                      >
+                        {workload}/
+                        {maxWorkload}
+                      </p>
+
+                      <p className="text-[9px] text-muted-foreground">
+                        {percentage}% workload
+                      </p>
+
+                    </div>
+
+                  </div>
+
+
+                  <div className="h-2 rounded-full bg-muted/30 mt-3 overflow-hidden">
+
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        overloaded
+                          ? 'bg-risk-high'
+                          : 'bg-primary'
+                      }`}
+                      style={{
+                        width: `${percentage}%`,
+                      }}
+                    />
+
+                  </div>
+
+
+                  <div className="flex justify-between mt-2">
+
+                    <span className="text-[9px] text-muted-foreground">
+
+                      {capacity?.available_capacity ??
+                        0}
+
+                      {' '}
+                      available capacity
+
+                    </span>
+
+
+                    {overloaded && (
+
+                      <span className="text-[9px] font-bold text-risk-high">
+                        HIGH WORKLOAD
+                      </span>
+
+                    )}
+
+                  </div>
+
+                </button>
+              );
+            })}
+
+          </div>
+
+        )}
+
+      </section>
+
+
+      {/* RISK MONITOR */}
+
+      <section className="glass-card rounded-2xl border border-border p-5 mb-6">
+
+        <div className="flex items-center justify-between mb-5">
+
+          <div>
+
+            <span className="section-label">
+              Risk Intelligence
+            </span>
+
+            <h2 className="text-lg font-extrabold text-foreground mt-1">
+              High-Risk Requests
+            </h2>
+
+            <p className="text-xs text-muted-foreground mt-1">
+              Requests requiring careful workforce
+              routing.
+            </p>
+
+          </div>
+
+          <AlertTriangle
+            size={18}
+            className="text-risk-high"
+          />
+
+        </div>
+
+
+        {requests.filter(
+          (request) =>
+            Number(
+              request.risk_score ?? 0
+            ) >= 70
+        ).length === 0 ? (
+
+          <EmptyState
+            icon={<CheckCircle2 size={18} />}
+            message="No high-risk requests currently."
+          />
+
+        ) : (
+
+          <div className="space-y-3">
+
+            {requests
+              .filter(
+                (request) =>
+                  Number(
+                    request.risk_score ?? 0
+                  ) >= 70
+              )
+              .slice(0, 8)
+              .map((request) => {
+
+                const assignment =
+                  assignments.find(
+                    (item) =>
+                      item.request_id ===
+                      request.id
+                  );
+
+                const employee =
+                  assignment
+                    ? getEmployee(
+                        assignment.employee_id
+                      )
+                    : null;
+
+                const risk =
+                  Number(
+                    request.risk_score ?? 0
+                  );
+
+                return (
+                  <div
+                    key={request.id}
+                    className="rounded-xl border border-risk-high/20 bg-risk-high/5 p-4"
+                  >
+
+                    <div className="flex items-start justify-between gap-4">
+
+                      <div className="min-w-0">
+
+                        <p className="text-xs font-bold text-foreground">
+                          {request.title}
+                        </p>
+
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {request.department ??
+                            'No department'}
+                          {' · '}
+                          {request.priority ??
+                            'HIGH'}
+                        </p>
+
+                      </div>
+
+
+                      <span className="shrink-0 text-[10px] font-black text-risk-high">
+                        RISK {risk}
+                      </span>
+
+                    </div>
+
+
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-3">
+
+                      <span className="text-[10px] text-muted-foreground">
+
+                        {employee
+                          ? `Assigned → ${employee.name}`
+                          : 'Not assigned'}
+
+                      </span>
+
+
+                      <span className="text-[9px] font-bold text-primary">
+                        {request.status ??
+                          'PENDING'}
+                      </span>
+
+                    </div>
+
+
+                    {/* ROUTING EXPLANATION */}
+
+                    {employee && (
+                      <div className="mt-3 rounded-lg bg-background/40 border border-primary/10 p-3">
+
+                        <div className="flex items-center gap-2">
+
+                          <Zap
+                            size={12}
+                            className="text-primary"
+                          />
+
+                          <p className="text-[9px] uppercase tracking-widest text-primary font-bold">
+                            Foresight Routing
+                          </p>
+
+                        </div>
+
+                        <p className="text-[10px] text-muted-foreground mt-2">
+
+                          Assigned to{' '}
+
+                          <span className="font-bold text-foreground">
+                            {employee.name}
+                          </span>
+
+                          {' '}because the employee
+                          is currently eligible for
+                          this request based on
+                          workforce capacity and
+                          routing criteria.
+
+                        </p>
+
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })}
+
+          </div>
+
+        )}
+
       </section>
 
 
@@ -475,6 +982,7 @@ export default function AdminPage() {
           <div className="flex items-center justify-between mb-5">
 
             <div>
+
               <span className="section-label">
                 Work Management
               </span>
@@ -482,6 +990,7 @@ export default function AdminPage() {
               <h2 className="text-lg font-extrabold text-foreground mt-1">
                 Recent Requests
               </h2>
+
             </div>
 
             <Zap
@@ -504,7 +1013,7 @@ export default function AdminPage() {
             <div className="space-y-2">
 
               {requests
-                .slice(0, 6)
+                .slice(0, 8)
                 .map((request) => {
 
                   const assignment =
@@ -513,6 +1022,18 @@ export default function AdminPage() {
                         item.request_id ===
                         request.id
                     );
+
+                  const employee =
+                    assignment
+                      ? getEmployee(
+                          assignment.employee_id
+                        )
+                      : null;
+
+                  const highRisk =
+                    Number(
+                      request.risk_score ?? 0
+                    ) >= 70;
 
                   return (
                     <div
@@ -538,20 +1059,15 @@ export default function AdminPage() {
 
                         </div>
 
+
                         <span
                           className={`shrink-0 text-[9px] font-bold px-2 py-1 rounded-full ${
-                            Number(
-                              request.risk_score ??
-                                0
-                            ) >= 70
+                            highRisk
                               ? 'text-risk-high bg-risk-high/10'
                               : 'text-risk-low bg-risk-low/10'
                           }`}
                         >
-                          {Number(
-                            request.risk_score ??
-                              0
-                          ) >= 70
+                          {highRisk
                             ? 'HIGH RISK'
                             : 'NORMAL'}
                         </span>
@@ -562,13 +1078,17 @@ export default function AdminPage() {
                       <div className="flex items-center justify-between mt-3">
 
                         <span className="text-[10px] text-muted-foreground">
+
                           {assignment
-                            ? `Assigned → ${getEmployeeName(
-                                assignment.employee_id
-                              )}`
+                            ? `Assigned → ${
+                                employee?.name ??
+                                'Unknown'
+                              }`
                             : request.status ??
                               'PENDING'}
+
                         </span>
+
 
                         <span className="text-[10px] font-semibold text-primary">
                           {request.status ??
@@ -576,6 +1096,42 @@ export default function AdminPage() {
                         </span>
 
                       </div>
+
+
+                      {assignment && (
+                        <div className="mt-3 rounded-lg bg-primary/5 border border-primary/10 p-3">
+
+                          <div className="flex items-center gap-2">
+
+                            <ShieldCheck
+                              size={12}
+                              className="text-primary"
+                            />
+
+                            <p className="text-[9px] uppercase tracking-widest text-primary font-bold">
+                              Foresight Routing
+                            </p>
+
+                          </div>
+
+                          <p className="text-[10px] text-muted-foreground mt-1">
+
+                            Routed to{' '}
+
+                            <span className="font-bold text-foreground">
+                              {employee?.name ??
+                                'Unknown employee'}
+                            </span>
+
+                            {' '}using workforce
+                            availability, capacity
+                            and request routing
+                            criteria.
+
+                          </p>
+
+                        </div>
+                      )}
 
                     </div>
                   );
@@ -595,6 +1151,7 @@ export default function AdminPage() {
           <div className="flex items-center justify-between mb-5">
 
             <div>
+
               <span className="section-label">
                 Workforce
               </span>
@@ -602,6 +1159,7 @@ export default function AdminPage() {
               <h2 className="text-lg font-extrabold text-foreground mt-1">
                 Employee Capacity
               </h2>
+
             </div>
 
             <TrendingUp
@@ -624,7 +1182,7 @@ export default function AdminPage() {
             <div className="space-y-2">
 
               {employees
-                .slice(0, 8)
+                .slice(0, 10)
                 .map((employee) => {
 
                   const capacity =
@@ -636,17 +1194,21 @@ export default function AdminPage() {
 
                   return (
                     <button
-  key={employee.id}
-  onClick={() =>
-    setSelectedEmployee(employee)
-  }
-  className="w-full text-left flex items-center gap-3 rounded-xl border border-border p-3 hover:bg-muted/20 transition-colors"
->
+                      key={employee.id}
+                      onClick={() =>
+                        setSelectedEmployee(
+                          employee
+                        )
+                      }
+                      className="w-full text-left flex items-center gap-3 rounded-xl border border-border p-3 hover:bg-muted/20 transition-colors"
+                    >
 
-                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+
                         {employee.name
                           ?.slice(0, 2)
                           .toUpperCase()}
+
                       </div>
 
 
@@ -745,13 +1307,47 @@ export default function AdminPage() {
 
       </section>
 
+
+      {/* FOOTER STATUS */}
+
+      <div className="mt-6 rounded-xl border border-primary/10 bg-primary/5 p-4">
+
+        <div className="flex items-start gap-3">
+
+          <ShieldCheck
+            size={16}
+            className="text-primary shrink-0 mt-0.5"
+          />
+
+          <div>
+
+            <p className="text-xs font-bold text-foreground">
+              Foresight Workforce Protection
+            </p>
+
+            <p className="text-[10px] leading-5 text-muted-foreground mt-1">
+
+              Capacity signals are intended to
+              support workload balancing and
+              should not be treated as medical
+              diagnoses or employee performance
+              scores.
+
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
     </main>
   );
 }
 
 
 /* =========================================================
-   COMPONENTS
+   STAT CARD
 ========================================================= */
 
 function StatCard({
@@ -788,13 +1384,16 @@ function StatCard({
 
       </div>
 
+
       <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-4">
         {label}
       </p>
 
+
       <p className="text-3xl font-black text-foreground mt-1">
         {value}
       </p>
+
 
       <p className="text-[10px] text-muted-foreground mt-1">
         {description}
@@ -804,6 +1403,10 @@ function StatCard({
   );
 }
 
+
+/* =========================================================
+   CAPACITY CARD
+========================================================= */
 
 function CapacityCard({
   label,
@@ -842,6 +1445,7 @@ function CapacityCard({
 
       </div>
 
+
       <div className="h-2 rounded-full bg-muted/30 mt-4 overflow-hidden">
 
         <div
@@ -853,6 +1457,7 @@ function CapacityCard({
 
       </div>
 
+
       <p className="text-[10px] text-muted-foreground mt-2">
         {percentage}% of workforce · {description}
       </p>
@@ -861,6 +1466,70 @@ function CapacityCard({
   );
 }
 
+
+/* =========================================================
+   HEALTH ALERT
+========================================================= */
+
+function HealthAlert({
+  label,
+  value,
+  description,
+  danger,
+}: {
+  label: string;
+  value: number;
+  description: string;
+  danger?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border p-4 ${
+        danger
+          ? 'border-risk-high/20 bg-risk-high/5'
+          : 'border-border'
+      }`}
+    >
+
+      <div className="flex items-center justify-between">
+
+        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          {label}
+        </p>
+
+        {danger && (
+          <AlertTriangle
+            size={13}
+            className="text-risk-high"
+          />
+        )}
+
+      </div>
+
+
+      <p
+        className={`text-2xl font-black mt-1 ${
+          danger
+            ? 'text-risk-high'
+            : 'text-foreground'
+        }`}
+      >
+        {value}
+      </p>
+
+
+      <p className="text-[9px] text-muted-foreground mt-1">
+        {description}
+      </p>
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   MINI STAT
+========================================================= */
 
 function MiniStat({
   label,
@@ -884,6 +1553,10 @@ function MiniStat({
   );
 }
 
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
 
 function EmptyState({
   icon,
