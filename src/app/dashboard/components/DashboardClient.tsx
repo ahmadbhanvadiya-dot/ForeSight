@@ -491,7 +491,8 @@ export default function DashboardClient() {
           </div>
 
         </motion.div>
-
+        
+             <WorkRequestCreator />
 
         {/* ====================================================
             STATS
@@ -742,7 +743,6 @@ export default function DashboardClient() {
 
             <div className="space-y-3">
 
-                  <WorkRequestCreator />
 
 
               {urgent.length > 0 ? (
