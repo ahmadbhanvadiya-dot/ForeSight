@@ -22,16 +22,18 @@ export async function POST(req: Request) {
       department,
       priority,
       risk_score,
+      required_skills,
     } = body;
 
-    // -----------------------------------------
+    // =====================================================
     // VALIDATION
-    // -----------------------------------------
+    // =====================================================
 
     if (!title?.trim()) {
       return NextResponse.json(
         {
-          error: 'Request title is required.',
+          error:
+            'Request title is required.',
         },
         { status: 400 }
       );
@@ -40,29 +42,52 @@ export async function POST(req: Request) {
     if (!department) {
       return NextResponse.json(
         {
-          error: 'Department is required.',
+          error:
+            'Department is required.',
         },
         { status: 400 }
       );
     }
 
-    // -----------------------------------------
-    // 1. CREATE WORK REQUEST
-    // -----------------------------------------
+    const requestRisk = Math.min(
+      100,
+      Math.max(
+        0,
+        Number(risk_score ?? 50)
+      )
+    );
 
-    const { data: request, error: requestError } =
-      await supabase
-        .from('work_requests')
-        .insert({
-          title: title.trim(),
-          description: description?.trim() || '',
-          department,
-          priority: priority || 'MEDIUM',
-          risk_score: risk_score ?? 50,
-          status: 'PENDING',
-        })
-        .select()
-        .single();
+    const requestPriority =
+      priority || 'MEDIUM';
+
+    // =====================================================
+    // 1. CREATE WORK REQUEST
+    // =====================================================
+
+    const {
+      data: request,
+      error: requestError,
+    } = await supabase
+      .from('work_requests')
+      .insert({
+        title: title.trim(),
+
+        description:
+          description?.trim() || '',
+
+        department,
+
+        priority:
+          requestPriority,
+
+        risk_score:
+          requestRisk,
+
+        status:
+          'PENDING',
+      })
+      .select()
+      .single();
 
     if (requestError) {
       console.error(
@@ -75,9 +100,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // -----------------------------------------
-    // 2. GET EMPLOYEES
-    // -----------------------------------------
+    // =====================================================
+    // 2. GET EMPLOYEES + CAPACITY
+    // =====================================================
 
     const {
       data: employees,
@@ -114,24 +139,47 @@ export async function POST(req: Request) {
     if (!employees?.length) {
       return NextResponse.json({
         success: true,
+
         assigned: false,
+
         request,
+
         message:
           'Request created, but no employees were found.',
       });
     }
 
-    // -----------------------------------------
-    // 3. SCORE EMPLOYEES
-    // -----------------------------------------
+    // =====================================================
+    // 3. NORMALIZE REQUIRED SKILLS
+    // =====================================================
+
+    const normalizedRequiredSkills =
+      Array.isArray(required_skills)
+        ? required_skills.map(
+            (skill: string) =>
+              skill
+                .toLowerCase()
+                .trim()
+          )
+        : [];
+
+    // =====================================================
+    // 4. SCORE EMPLOYEES
+    // =====================================================
 
     const candidates = employees
       .map((employee: any) => {
-        const capacity = Array.isArray(
-          employee.employee_capacity
-        )
-          ? employee.employee_capacity[0]
-          : employee.employee_capacity;
+        const capacity =
+          Array.isArray(
+            employee.employee_capacity
+          )
+            ? employee
+                .employee_capacity[0]
+            : employee.employee_capacity;
+
+        // ---------------------------------------------
+        // Employee has no capacity profile
+        // ---------------------------------------------
 
         if (!capacity) {
           return null;
@@ -147,67 +195,249 @@ export async function POST(req: Request) {
             capacity.current_workload ?? 0
           );
 
+        const maxWorkload =
+          Number(
+            capacity.max_workload ?? 10
+          );
+
         const availableCapacity =
           Number(
             capacity.available_capacity ?? 0
           );
 
-        // Don't assign HIGH stress employees
+        // =================================================
+        // HARD SAFETY FILTERS
+        // =================================================
+
+        // High stress employees should not receive
+        // additional work.
+
         if (
-          capacity.stress_level === 'HIGH'
+          capacity.stress_level ===
+          'HIGH'
         ) {
           return null;
         }
 
-        // Don't assign employees with no capacity
-        if (availableCapacity <= 0) {
+        // No remaining capacity.
+
+        if (
+          availableCapacity <= 0
+        ) {
           return null;
         }
 
-        // -------------------------------------
-        // SCORING
-        // -------------------------------------
+        // Workload already at maximum.
+
+        if (
+          maxWorkload > 0 &&
+          currentWorkload >=
+            maxWorkload
+        ) {
+          return null;
+        }
+
+        // =================================================
+        // A. DEPARTMENT FIT
+        // =================================================
 
         const departmentScore =
-          employee.department === department
+          employee.department
+            ?.toLowerCase()
+            .trim() ===
+          department
+            ?.toLowerCase()
+            .trim()
             ? 100
             : 40;
+
+        // =================================================
+        // B. STRESS / CAPACITY
+        // =================================================
 
         const stressCapacityScore =
           Math.max(
             0,
-            100 - stressScore
+            Math.min(
+              100,
+              100 - stressScore
+            )
           );
+
+        // =================================================
+        // C. AVAILABLE CAPACITY
+        // =================================================
 
         const availabilityScore =
-          Math.min(
-            100,
-            availableCapacity * 10
-          );
-
-        const workloadScore =
           Math.max(
             0,
-            100 -
-              currentWorkload * 10
+            Math.min(
+              100,
+              availableCapacity * 10
+            )
           );
 
-        const finalScore =
-          departmentScore * 0.40 +
+        // =================================================
+        // D. CURRENT WORKLOAD
+        // =================================================
+
+        let workloadScore = 100;
+
+        if (
+          maxWorkload > 0
+        ) {
+          const workloadPercentage =
+            (currentWorkload /
+              maxWorkload) *
+            100;
+
+          workloadScore =
+            Math.max(
+              0,
+              Math.min(
+                100,
+                100 -
+                  workloadPercentage
+              )
+            );
+        }
+
+        // =================================================
+        // E. RISK SUITABILITY
+        // =================================================
+
+        let riskSuitabilityScore =
+          stressCapacityScore;
+
+        /*
+         * For low-risk work, normal capacity is enough.
+         *
+         * For high-risk work, we want employees with
+         * significantly better capacity.
+         */
+
+        if (requestRisk >= 90) {
+          riskSuitabilityScore =
+            stressCapacityScore >= 80
+              ? 100
+              : stressCapacityScore >= 60
+                ? 75
+                : 40;
+        } else if (
+          requestRisk >= 70
+        ) {
+          riskSuitabilityScore =
+            stressCapacityScore >= 70
+              ? 100
+              : stressCapacityScore >= 50
+                ? 75
+                : 50;
+        }
+
+        // =================================================
+        // F. SKILL MATCH
+        // =================================================
+
+        /*
+         * Current employee table may not contain a skills
+         * column. Therefore this remains optional.
+         */
+
+        const employeeSkills =
+          Array.isArray(
+            employee.skills
+          )
+            ? employee.skills.map(
+                (skill: string) =>
+                  skill
+                    .toLowerCase()
+                    .trim()
+              )
+            : [];
+
+        let skillScore = 50;
+
+        if (
+          normalizedRequiredSkills
+            .length > 0 &&
+          employeeSkills.length > 0
+        ) {
+          const matchedSkills =
+            normalizedRequiredSkills.filter(
+              (required: string) =>
+                employeeSkills.includes(
+                  required
+                )
+            ).length;
+
+          skillScore =
+            Math.round(
+              (matchedSkills /
+                normalizedRequiredSkills.length) *
+                100
+            );
+        } else if (
+          normalizedRequiredSkills
+            .length === 0
+        ) {
+          skillScore = 70;
+        }
+
+        // =================================================
+        // 5. FORESIGHT SCORE
+        // =================================================
+
+        /*
+         * Weighting:
+         *
+         * Department       30%
+         * Capacity         25%
+         * Availability     20%
+         * Workload         15%
+         * Risk suitability 10%
+         *
+         * Skill matching is used as a small bonus.
+         */
+
+        const baseScore =
+          departmentScore * 0.30 +
           stressCapacityScore * 0.25 +
           availabilityScore * 0.20 +
-          workloadScore * 0.15;
+          workloadScore * 0.15 +
+          riskSuitabilityScore * 0.10;
+
+        const skillBonus =
+          skillScore * 0.05;
+
+        const finalScore =
+          Math.min(
+            100,
+            baseScore * 0.95 +
+              skillBonus
+          );
+
+        // =================================================
+        // RETURN CANDIDATE
+        // =================================================
 
         return {
           employee,
+
           capacity,
 
           finalScore,
 
           departmentScore,
+
           stressCapacityScore,
+
           availabilityScore,
+
           workloadScore,
+
+          riskSuitabilityScore,
+
+          skillScore,
         };
       })
       .filter(Boolean)
@@ -217,26 +447,45 @@ export async function POST(req: Request) {
           a.finalScore
       );
 
-    // -----------------------------------------
-    // 4. NO SUITABLE EMPLOYEE
-    // -----------------------------------------
+    // =====================================================
+    // 6. NO SUITABLE EMPLOYEE
+    // =====================================================
 
-    if (!candidates.length) {
+    if (
+      !candidates.length
+    ) {
       return NextResponse.json({
         success: true,
+
         assigned: false,
+
         request,
 
         message:
           'No employee currently has enough capacity for this request.',
+
+        foresight: {
+          riskScore:
+            requestRisk,
+
+          priority:
+            requestPriority,
+
+          candidatesEvaluated:
+            employees.length,
+
+          candidatesEligible:
+            0,
+        },
       });
     }
 
-    // -----------------------------------------
-    // 5. BEST EMPLOYEE
-    // -----------------------------------------
+    // =====================================================
+    // 7. SELECT BEST EMPLOYEE
+    // =====================================================
 
-    const best = candidates[0] as any;
+    const best =
+      candidates[0] as any;
 
     const selectedEmployee =
       best.employee;
@@ -244,9 +493,9 @@ export async function POST(req: Request) {
     const selectedCapacity =
       best.capacity;
 
-    // -----------------------------------------
-    // 6. CREATE ASSIGNMENT
-    // -----------------------------------------
+    // =====================================================
+    // 8. CREATE ASSIGNMENT
+    // =====================================================
 
     const {
       data: assignment,
@@ -254,10 +503,14 @@ export async function POST(req: Request) {
     } = await supabase
       .from('assignments')
       .insert({
-        request_id: request.id,
+        request_id:
+          request.id,
+
         employee_id:
           selectedEmployee.id,
-        status: 'ASSIGNED',
+
+        status:
+          'ASSIGNED',
       })
       .select()
       .single();
@@ -273,57 +526,124 @@ export async function POST(req: Request) {
       );
     }
 
-    // -----------------------------------------
-    // 7. UPDATE REQUEST
-    // -----------------------------------------
+    // =====================================================
+    // 9. UPDATE REQUEST
+    // =====================================================
 
-    const { error: requestUpdateError } =
-      await supabase
-        .from('work_requests')
-        .update({
-          status: 'ASSIGNED',
-        })
-        .eq('id', request.id);
+    const {
+      error:
+        requestUpdateError,
+    } = await supabase
+      .from('work_requests')
+      .update({
+        status:
+          'ASSIGNED',
+      })
+      .eq(
+        'id',
+        request.id
+      );
 
-    if (requestUpdateError) {
+    if (
+      requestUpdateError
+    ) {
       throw new Error(
         requestUpdateError.message
       );
     }
 
-    // -----------------------------------------
-    // 8. UPDATE EMPLOYEE WORKLOAD
-    // -----------------------------------------
+    // =====================================================
+    // 10. UPDATE EMPLOYEE WORKLOAD
+    // =====================================================
 
     const newWorkload =
       Number(
-        selectedCapacity.current_workload ?? 0
+        selectedCapacity.current_workload ??
+          0
       ) + 1;
 
-    const { error: capacityUpdateError } =
-      await supabase
-        .from('employee_capacity')
-        .update({
-          current_workload:
-            newWorkload,
+    const {
+      error:
+        capacityUpdateError,
+    } = await supabase
+      .from('employee_capacity')
+      .update({
+        current_workload:
+          newWorkload,
 
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq(
-          'employee_id',
-          selectedEmployee.id
-        );
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq(
+        'employee_id',
+        selectedEmployee.id
+      );
 
-    if (capacityUpdateError) {
+    if (
+      capacityUpdateError
+    ) {
       throw new Error(
         capacityUpdateError.message
       );
     }
 
-    // -----------------------------------------
-    // 9. RETURN RESULT
-    // -----------------------------------------
+    // =====================================================
+    // 11. ROUTING EXPLANATION
+    // =====================================================
+
+    const explanation = [];
+
+    if (
+      best.departmentScore >= 80
+    ) {
+      explanation.push(
+        'Department match'
+      );
+    }
+
+    if (
+      best.stressCapacityScore >= 70
+    ) {
+      explanation.push(
+        'Strong capacity'
+      );
+    }
+
+    if (
+      best.availabilityScore >= 70
+    ) {
+      explanation.push(
+        'Good availability'
+      );
+    }
+
+    if (
+      best.workloadScore >= 70
+    ) {
+      explanation.push(
+        'Low current workload'
+      );
+    }
+
+    if (
+      best.riskSuitabilityScore >= 80
+    ) {
+      explanation.push(
+        'Suitable for request risk'
+      );
+    }
+
+    if (
+      best.skillScore >= 80
+    ) {
+      explanation.push(
+        'Strong skill match'
+      );
+    }
+
+    // =====================================================
+    // 12. RETURN RESULT
+    // =====================================================
 
     return NextResponse.json({
       success: true,
@@ -335,7 +655,8 @@ export async function POST(req: Request) {
       assignment,
 
       employee: {
-        id: selectedEmployee.id,
+        id:
+          selectedEmployee.id,
 
         employee_code:
           selectedEmployee.employee_code,
@@ -350,9 +671,10 @@ export async function POST(req: Request) {
           selectedEmployee.role,
       },
 
-      foresightScore: Math.round(
-        best.finalScore
-      ),
+      foresightScore:
+        Math.round(
+          best.finalScore
+        ),
 
       reasoning: {
         department:
@@ -374,6 +696,42 @@ export async function POST(req: Request) {
           Math.round(
             best.workloadScore
           ),
+
+        riskSuitability:
+          Math.round(
+            best.riskSuitabilityScore
+          ),
+
+        skillMatch:
+          Math.round(
+            best.skillScore
+          ),
+      },
+
+      routing: {
+        requestRisk:
+          requestRisk,
+
+        priority:
+          requestPriority,
+
+        explanation,
+
+        candidatesEvaluated:
+          employees.length,
+
+        candidatesEligible:
+          candidates.length,
+
+        selectedEmployee:
+          selectedEmployee.name,
+
+        selectedEmployeeCapacity:
+          selectedCapacity
+            .available_capacity,
+
+        selectedEmployeeWorkload:
+          newWorkload,
       },
     });
 
