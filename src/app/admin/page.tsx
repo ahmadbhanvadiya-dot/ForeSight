@@ -15,7 +15,7 @@ import {
   RefreshCw,
   UserRound,
 } from 'lucide-react';
-
+import AdminWorkforceOverview from './components/AdminWorkforceOverview';
 import { supabase } from '../../lib/supabase';
 
 type Employee = {
@@ -289,7 +289,7 @@ export default function AdminPage() {
     capacities,
     requests,
   ]);
-
+<AdminWorkforceOverview />
   const getEmployeeName = (
     employeeId: string
   ) => {
