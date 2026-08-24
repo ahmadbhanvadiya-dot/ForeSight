@@ -1,6 +1,4 @@
-Here is the **entire `README.md` file** ready to copy-paste:
 
-````markdown
 # ForeSight
 
 ### Predict. Explain. Act.
