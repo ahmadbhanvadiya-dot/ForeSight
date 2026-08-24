@@ -7,10 +7,10 @@ ForeSight is an intelligent operational-risk and workforce-routing platform that
 
 
 
-```markdown
 ## 🌐 Live Demo
 
 🚀 **Deployed Application:**  
+```
 https://spih-133.vercel.app
 ```
 
@@ -115,5 +115,4 @@ ForeSight helps organizations understand:
 > **Who can act?**
 
 ### Predict. Explain. Act.
-
 
