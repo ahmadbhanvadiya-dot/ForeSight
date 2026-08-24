@@ -32,6 +32,7 @@ jest-test-results.json
 # Optional: if using IDEs
 .vscode/
 .idea/
+.env.local
 
 # Optional: if using TurboRepo or monorepo
 turbo/
