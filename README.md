@@ -5,14 +5,10 @@
 
 ForeSight is an intelligent operational-risk and workforce-routing platform that helps organizations detect potentially delayed work requests and automatically assign them to the most suitable available employee.
 
-
-
 ## 🌐 Live Demo
 
 🚀 **Deployed Application:**  
-```markdown
 https://spih-133.vercel.app
-```
 
 ## 🚀 Features
 
