@@ -1,3 +1,6 @@
+Here is the **entire `README.md` file** ready to copy-paste:
+
+````markdown
 # ForeSight
 
 ### Predict. Explain. Act.
@@ -38,3 +41,75 @@ Routing Score
 Best Employee
      ↓
 Admin Dashboard
+````
+
+## 🛠️ Tech Stack
+
+* Next.js
+* React
+* TypeScript
+* Tailwind CSS
+* Supabase
+* Framer Motion
+* Recharts
+* Lucide React
+
+## ⚙️ Run Locally
+
+### 1. Clone the repository
+
+```bash
+git clone <YOUR_REPO_URL>
+cd foresight
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Add environment variables
+
+Create a `.env.local` file:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
+
+> ⚠️ Never commit your `.env.local` file or expose your Supabase service role key.
+
+### 4. Start the development server
+
+```bash
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+## 🎯 Vision
+
+Traditional dashboards tell you:
+
+> **What happened?**
+
+ForeSight helps organizations understand:
+
+> **What is going wrong?**
+
+> **Why is it happening?**
+
+> **Who can act?**
+
+### Predict. Explain. Act.
+
+```
+
+Save that as **`README.md`** in the root of your GitHub repository.
+```
